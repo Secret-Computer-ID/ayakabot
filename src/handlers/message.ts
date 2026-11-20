@@ -1,39 +1,34 @@
-
 import { askAI } from "../services/ai.js";
 
 interface WhatsAppMessage {
   from: string;
   type: string;
-  text?: {
-    body?: string;
-  };
+  text?: { body?: string };
 }
 
 interface WebhookPayload {
   entry?: Array<{
     changes?: Array<{
-      value?: {
-        messages?: WhatsAppMessage[];
-      };
+      value?: { messages?: WhatsAppMessage[] };
     }>;
   }>;
 }
 
-const TOKEN = process.env.WHATSAPP_TOKEN;
-const PHONE_ID = process.env.WHATSAPP_PHONE_NUMBER_ID;
-const OWNER = (process.env.OWNER_NUMBER || "").replace(/\D/g, "");
-
 async function sendMessage(to: string, message: string) {
-  if (!TOKEN || !PHONE_ID) {
-    throw new Error("WhatsApp API belum dikonfigurasi.");
+  const token = process.env.WHATSAPP_TOKEN;
+  const phoneId = process.env.WHATSAPP_PHONE_NUMBER_ID;
+  const version = process.env.WHATSAPP_API_VERSION;
+
+  if (!token || !phoneId || !version) {
+    throw new Error("Konfigurasi WhatsApp belum lengkap.");
   }
 
   const response = await fetch(
-    `https://graph.facebook.com/vXX.X/${PHONE_ID}/messages`,
+    `https://graph.facebook.com/${version}/${phoneId}/messages`,
     {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${TOKEN}`,
+        Authorization: `Bearer ${token}`,
         "Content-Type": "application/json"
       },
       body: JSON.stringify({
@@ -41,9 +36,7 @@ async function sendMessage(to: string, message: string) {
         recipient_type: "individual",
         to,
         type: "text",
-        text: {
-          body: message
-        }
+        text: { body: message }
       })
     }
   );
@@ -54,12 +47,10 @@ async function sendMessage(to: string, message: string) {
 }
 
 async function processMessage(message: WhatsAppMessage) {
+  const owner = (process.env.OWNER_NUMBER || "").replace(/\D/g, "");
   const sender = message.from.replace(/\D/g, "");
 
-  // Owner-only access
-  if (!OWNER || sender !== OWNER) {
-    return;
-  }
+  if (!owner || sender !== owner) return;
 
   if (message.type !== "text" || !message.text?.body) {
     await sendMessage(sender, "Saat ini Aiaka hanya menerima pesan teks.");
@@ -82,8 +73,7 @@ async function processMessage(message: WhatsAppMessage) {
 /ping - Cek status bot
 /ai [pertanyaan] - Tanya AI
 
-AI Assistant: Online
-`
+AI Assistant: Online`
     );
     return;
   }
@@ -109,11 +99,9 @@ AI Assistant: Online
 export async function handleWebhook(payload: WebhookPayload) {
   for (const entry of payload.entry || []) {
     for (const change of entry.changes || []) {
-      const messages = change.value?.messages || [];
-
-      for (const message of messages) {
+      for (const message of change.value?.messages || []) {
         await processMessage(message);
       }
     }
   }
-}
+}q
