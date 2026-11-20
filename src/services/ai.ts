@@ -1,23 +1,28 @@
-import Groq from "groq-sdk";
 
-const groq = new Groq({
-  apiKey: process.env.GROQ_API_KEY
-});
+import Groq from "groq-sdk";
 
 export async function askAI(
   prompt: string
 ): Promise<string> {
-  if (!process.env.GROQ_API_KEY) {
+  const apiKey = process.env.GROQ_API_KEY;
+
+  if (!apiKey) {
     throw new Error("Groq API key belum dikonfigurasi.");
   }
 
+  const groq = new Groq({
+    apiKey
+  });
+
   const completion = await groq.chat.completions.create({
-    model: process.env.GROQ_MODEL || "llama-3.3-70b-versatile",
+    model:
+      process.env.GROQ_MODEL ||
+      "llama-3.3-70b-versatile",
     messages: [
       {
         role: "system",
         content:
-          "You are Aiaka, a helpful and intelligent WhatsApp assistant. Reply naturally and concisely."
+          "You are Aiaka, a helpful personal AI assistant. Reply naturally, clearly, and concisely."
       },
       {
         role: "user",
@@ -30,6 +35,6 @@ export async function askAI(
 
   return (
     completion.choices[0]?.message?.content ||
-    "Maaf, AI tidak memberikan respons."
+    "Maaf, tidak ada respons dari AI."
   );
 }
