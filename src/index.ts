@@ -1,7 +1,7 @@
-
 import express from "express";
 import crypto from "node:crypto";
 import dotenv from "dotenv";
+import { handleWebhook } from "./handlers/message.js";
 
 dotenv.config();
 
@@ -11,6 +11,7 @@ const PORT = Number(process.env.PORT) || 3000;
 const VERIFY_TOKEN = process.env.WHATSAPP_VERIFY_TOKEN;
 const APP_SECRET = process.env.WHATSAPP_APP_SECRET;
 
+// Health check
 app.get("/", (_req, res) => {
   res.json({
     name: "Aiaka",
@@ -20,6 +21,7 @@ app.get("/", (_req, res) => {
   });
 });
 
+// Server health
 app.get("/health", (_req, res) => {
   res.json({
     status: "healthy",
@@ -38,19 +40,21 @@ app.get("/webhook", (req, res) => {
     token === VERIFY_TOKEN &&
     VERIFY_TOKEN
   ) {
+    console.log("WhatsApp webhook verified.");
     return res.status(200).send(challenge);
   }
 
   return res.sendStatus(403);
 });
 
-// WhatsApp incoming events
+// WhatsApp incoming messages
 app.post(
   "/webhook",
   express.raw({ type: "application/json" }),
   (req, res) => {
     const signature = req.headers["x-hub-signature-256"];
 
+    // Verify Meta signature
     if (APP_SECRET) {
       const expected =
         "sha256=" +
@@ -73,27 +77,41 @@ app.post(
         );
 
       if (!valid) {
+        console.warn("Invalid webhook signature.");
         return res.sendStatus(401);
       }
     } else if (process.env.NODE_ENV === "production") {
-      console.error("WhatsApp App Secret is not configured.");
+      console.error("Missing WhatsApp App Secret.");
       return res.sendStatus(503);
     }
 
+    let payload;
+
     try {
-      const payload = JSON.parse(req.body.toString());
-
-      console.log("WhatsApp webhook event received.");
-
-      // Message handling will be implemented next.
-
-      return res.sendStatus(200);
+      payload = JSON.parse(req.body.toString());
     } catch {
       return res.sendStatus(400);
     }
+
+    console.log("WhatsApp webhook event received.");
+
+    // Acknowledge Meta before processing
+    res.sendStatus(200);
+
+    // Process incoming messages
+    void handleWebhook(payload).catch((error) => {
+      console.error("Webhook processing error:", error);
+    });
   }
 );
 
+// Start server
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`Aiaka is running on port ${PORT}`);
+  console.log("--------------------------------");
+  console.log("       AIAKA BOT SERVER");
+  console.log("--------------------------------");
+  console.log(`Status: Online`);
+  console.log(`Port: ${PORT}`);
+  console.log(`Environment: ${process.env.NODE_ENV || "development"}`);
+  console.log("--------------------------------");
 });
